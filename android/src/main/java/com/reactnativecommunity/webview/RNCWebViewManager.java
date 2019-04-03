@@ -24,6 +24,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.CookieSyncManager;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -368,6 +369,32 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     ((RNCWebView) view).setMessagingEnabled(enabled);
   }
 
+  public void setCookies(WebView view, @Nullable ReadableMap cookieAndDomain) {
+        // key should be the cookie, value should be domain
+        clearCookies(view);
+        ReadableMapKeySetIterator iterator = cookieAndDomain.keySetIterator();
+        while (iterator.hasNextKey()) {
+            String key = iterator.nextKey();
+            CookieManager.getInstance().setCookie(cookieAndDomain.getString(key), key);
+        }
+    }
+
+     private void clearCookies(WebView view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            CookieManager.getInstance().removeAllCookies(null);
+            CookieManager.getInstance().flush();
+        } else {
+            ReactContext reactContext = (ReactContext) view.getContext();
+            CookieSyncManager cookieSyncMngr=CookieSyncManager.createInstance(reactContext);
+            cookieSyncMngr.startSync();
+            CookieManager cookieManager=CookieManager.getInstance();
+            cookieManager.removeAllCookie();
+            cookieManager.removeSessionCookie();
+            cookieSyncMngr.stopSync();
+            cookieSyncMngr.sync();
+        }
+    }
+
   @ReactProp(name = "source")
   public void setSource(WebView view, @Nullable ReadableMap source) {
     if (source != null) {
@@ -382,6 +409,9 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
         return;
       }
       if (source.hasKey("uri")) {
+        if (source.hasKey("setCookies")) {
+            setCookies(view, source.getMap("setCookies"));
+        }
         String url = source.getString("uri");
         String previousUrl = view.getUrl();
         if (previousUrl != null && previousUrl.equals(url)) {
@@ -797,3 +827,4 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     }
   }
 }
+
